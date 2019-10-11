@@ -21,15 +21,13 @@ import java.util.*;
 @Slf4j
 @Data
 @Getter
-public class MainService {
+public class MainService extends Outils {
 
     private List<String> dates;
     private List<String> clients;
     private double[][] data;
-    private double[][] newData;
+    private double[][] variations;
     private double[] variationMoyenne;
-
-    private static final int PERIOD=12;
 
     public void readFromExcelFile(File file) {
         try {
@@ -55,8 +53,6 @@ public class MainService {
             }
             System.out.println("les données récupérées du fichier excel : ");
             displayMatrice(data);
-            /*Matrix matrix = new Matrix(data);
-            matrix.print(matrix.rank(), 0);*/
         }
         catch (IOException | BiffException e) {
             e.printStackTrace();
@@ -64,31 +60,31 @@ public class MainService {
     }
 
     public double[][] calculateVariationNormalised(){
-        newData=new double[data.length][data[0].length];
+        variations=new double[data.length][data[0].length];
         for(int j=0;j<data[0].length;j++)
         {
-            newData[0][j]=0.0;
+            variations[0][j]=0.0;
             for(int i=1;i<data.length;i++)
             {
-                newData[i][j]=doublePrecision((data[i][j]-data[i-1][j])/data[i-1][j],6);
+                variations[i][j]=doublePrecision((data[i][j]-data[i-1][j])/data[i-1][j],6);
             }
         }
         System.out.println("Aprés le calcul de la variation et la normalisation : ");
-        displayMatrice(newData);
-        return newData;
+        displayMatrice(variations);
+        return variations;
     }
 
     public Map<String,Double> meanVariation(){
-        Map<String,Double> variations=new HashMap<>();
+        Map<String,Double> meanVariations=new HashMap<>();
         double moy;
-        variationMoyenne=new double[newData[0].length];
-        for(int j=0;j<newData[0].length;j++)
+        variationMoyenne=new double[variations[0].length];
+        for(int j=0;j<variations[0].length;j++)
         {
-            moy=meanVariation(newData,j);
+            moy=meanVariation(variations,j);
             variationMoyenne[j]=moy;
-            variations.put(clients.get(j),moy);
+            meanVariations.put(clients.get(j),moy);
         }
-        return variations;
+        return meanVariations;
     }
 
     public List<ClientStat> recuperateStat(){
@@ -119,126 +115,14 @@ public class MainService {
         return stats;
     }
 
-    private double equarType(double[]tab,double moyenne,double count){
-
-        double v=0;
-        for(double x:tab)
-        {
-            v+=Math.pow((x-moyenne),2)/count;
-        }
-        return Math.sqrt(v);
-    }
-
-    private double minimum(double[] tab){
-        double min=Double.MAX_VALUE;
-        for(double d:tab){
-            if(d<min)
-                min=d;
-        }
-        return min;
-    }
-
-    private int indexMinimum(double[] tab){
-        double min=Double.MAX_VALUE;
-        int index=0;
-        for(int i=0;i<tab.length;i++){
-            if(tab[i]<min)
-            {
-                index=i;
-                min=tab[i];
-            }
-        }
-        return index;
-    }
-
-    private double maximum(double[] tab){
-        double max=Double.MIN_VALUE;
-        for(double d:tab){
-            if(d>max)
-                max=d;
-        }
-        return max;
-    }
-
-    private int indexMaximum(double[] tab){
-        double max=Double.MIN_VALUE;
-        int index=0;
-        for(int i=0;i<tab.length;i++){
-            if(tab[i]>max)
-            {
-                index=i;
-                max=tab[i];
-            }
-        }
-        return index;
-    }
-
-    private double moyenne(double[] tab){
-
-        double result=0;
-        for(double x:tab)
-        {
-            result+=x;
-        }
-        if(tab.length>0)
-            result=doublePrecision(result/tab.length,6);
-        return result;
-    }
-
-    private double meanVariation(double[][] matrice,int indexColumn){
-
-        double result=0;
-        for(int i=1;i<matrice.length;i++)
-        {
-            result+=matrice[i][indexColumn];
-        }
-        if(matrice.length>1)
-            result=doublePrecision(result/(matrice.length-1),6);
-        return result;
-    }
-
-    private void displayMatrice(double mat[][]) {
-        // Loop through all rows
-        for (double[] row : mat)
-
-            // converting each row as string
-            // and then printing in a separate line
-            System.out.println(Arrays.toString(row));
-    }
-
-    private double[] extractColumn(double[][] matrice,int indexColumn){
-        double[] column=new double[matrice.length];
-        for(int i=0;i<matrice.length;i++)
-        {
-            column[i]=matrice[i][indexColumn];
-        }
-        return column;
-    }
-
-    private double[] extractLigne(double[][] matrice,int indexLigne){
-       double[] ligne = new double[matrice[0].length];
-        for (int j = 0; j < matrice[0].length; j++) {
-            ligne[j] = matrice[indexLigne][j];
-        }
-        return ligne;
-    }
-
-    private double doublePrecision(double value,int precision){
-        value=value*Math.pow(10,precision);
-        long valueInteger=(long) value;
-        value=(double) valueInteger;
-        value=value/Math.pow(10,precision);
-        return value;
-    }
-
-    private PortfolioResult portfolioAnnualisedPerformance(double[] weights,double[] meanReturns,double[][] covMatrix){
+    private PortfolioResult portfolioAnnualisedPerformance(double[] weights,double[] meanReturns,double[][] covMatrix,int periode){
 
         double returns=0;
         for(int i=0;i<weights.length;i++)
             returns+=weights[i]*meanReturns[i];
-        returns=returns*PERIOD;
+        returns=returns*periode;
         double[] tab=multiplyMatriceByVector(covMatrix,weights);
-        double std=equarType(tab,moyenne(tab),PERIOD);
+        double std=equarType(tab,moyenne(tab),periode);
         return new PortfolioResult(returns,std);
     }
 
@@ -257,7 +141,8 @@ public class MainService {
         return vectorResult;
     }
 
-    private RandomPortfolioResult randomPortfolios(int numPortfolios,double[] meanReturns, double[][] covMatrix,double riskFreeRate){
+    private RandomPortfolioResult randomPortfolios(
+            int numPortfolios,double[] meanReturns, double[][] covMatrix, double riskFreeRate,int periode){
         double[][] results = initMatrice(3,numPortfolios);
         double[] weights;
         double[][] weightsRecord=new double[numPortfolios][meanReturns.length];
@@ -265,7 +150,7 @@ public class MainService {
             weights=generateRandomVector(meanReturns.length);
             for (int j=0;j<weights.length;j++)
                 weightsRecord[i][j]=weights[j];
-            PortfolioResult portfolioResult = portfolioAnnualisedPerformance(weights,meanReturns,covMatrix);
+            PortfolioResult portfolioResult = portfolioAnnualisedPerformance(weights,meanReturns,covMatrix,periode);
             results[0][i] = portfolioResult.getPortfolioStdDev();
             results[1][i] = portfolioResult.getPortfolioReturn();
             results[2][i] = (portfolioResult.getPortfolioReturn() - riskFreeRate) / portfolioResult.getPortfolioStdDev();
@@ -273,9 +158,8 @@ public class MainService {
         return new RandomPortfolioResult(weightsRecord,results);
     }
 
-    public void displaySimulated(double[] meanReturns, double[][] covMatrix, int numPortfolios, double riskFreeRate){
-
-        RandomPortfolioResult randomPortfolioResult = randomPortfolios(numPortfolios,meanReturns, covMatrix, riskFreeRate);
+    public void displaySimulated(double[] meanReturns, double[][] covMatrix, int numPortfolios, double riskFreeRate,int periode){
+        RandomPortfolioResult randomPortfolioResult = randomPortfolios(numPortfolios,meanReturns, covMatrix, riskFreeRate,periode);
         double[][] results=randomPortfolioResult.getResults();
         double[][] weights=randomPortfolioResult.getWeightsRecord();
         int max_sharpe_idx = indexMaximum(extractLigne(results,2));
@@ -285,7 +169,7 @@ public class MainService {
         for(int i=0;i<max_sharpe_allocation.length;i++)
             max_sharpe_allocation[i]=doublePrecision(max_sharpe_allocation[i]*100,2);
         int  min_vol_idx = indexMinimum(extractLigne(results,0));
-        double sdp_min=results[0][min_vol_idx];
+            double sdp_min=results[0][min_vol_idx];
         double rp_min =results[1][min_vol_idx];
         double[] min_vol_allocation = extractLigne(weights,min_vol_idx);
         for(int i=0;i<min_vol_allocation.length;i++)
@@ -306,32 +190,12 @@ public class MainService {
         System.out.println("Annualised Return:"+ doublePrecision(rp_min,2));
         System.out.println("Annualised Volatility:"+ doublePrecision(sdp_min,2));
         System.out.println("\n");
-
         HashMap<String,Double> allocationMin=new HashMap<>();
         for(int i=0;i<min_vol_allocation.length;i++)
         {
             allocationMin.put(clients.get(i),min_vol_allocation[i]);
             System.out.println(clients.get(i)+" : "+ min_vol_allocation[i]);
         }
-        /*plt.figure(figsize=(10, 7))
-        plt.scatter(results[0,:],results[1,:],c=results[2,:],cmap='YlGnBu', marker='o', s=10, plt.colorbar()
-        plt.scatter(sdp,rp,marker='*',color='r',s=500, label='Maximum Sharpe ratio')
-        plt.scatter(sdp_min,rp_min,marker='*',color='g',s=500, label='Minimum volatility')
-        plt.title('Simulated Portfolio Optimization based on Efficient Frontier')
-        plt.xlabel('annualised volatility')
-        plt.ylabel('annualised returns')
-        plt.legend(labelspacing=0.8)*/
-
-    }
-
-    private double[][] initMatrice(int nl,int nc){
-        double[][] matrice = new double[nl][nc];
-        for (int i=0;i<nl;i++) {
-            for (int j =0; j < nc; j++) {
-                matrice[i][j]=0.0;
-            }
-        }
-        return matrice;
     }
 
     private double[] generateRandomVector(int sizeVector){

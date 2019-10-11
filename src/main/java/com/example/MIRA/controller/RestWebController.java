@@ -3,6 +3,7 @@ package com.example.MIRA.controller;
 
 import com.example.MIRA.model.ClientStat;
 import com.example.MIRA.service.MainService;
+import com.example.MIRA.service.Outils;
 import io.swagger.annotations.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -19,7 +20,7 @@ import java.util.Map;
 @Scope("prototype")
 @RestController
 @Api(value = "Guidelines", description = "Describes the guidelines for Spring boot 2.0.1 for uploading large file using Swagger UI")
-public class RestWebController {
+public class RestWebController extends Outils {
 
     @Autowired
     private MainService mainService;
@@ -28,6 +29,8 @@ public class RestWebController {
     private int numPortfolios;
     @Value("${riskFreeRate}")
     private double riskFreeRate;
+    @Value("${period}")
+    private int period;
 
     @PostMapping(value = "01/recuperateStat",consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public List<ClientStat> recuperateStat(
@@ -63,9 +66,12 @@ public class RestWebController {
             @ApiParam(name = "file", value = "Select the file to Upload", required = true)
             @RequestPart("file") MultipartFile file) {
         mainService.readFromExcelFile(convertMultiPartToFile(file));
+        //récupérer seulement les données des 12 derniers mois
+        //double[][] recentData=extractRecentDataFromMatrice(mainService.getData(),period);
+        //mainService.setData(recentData);
         mainService.calculateVariationNormalised();
         mainService.meanVariation();
-        mainService.displaySimulated(mainService.getVariationMoyenne(),mainService.getNewData(),numPortfolios,riskFreeRate);
+        mainService.displaySimulated(mainService.getVariationMoyenne(),mainService.getVariations(),numPortfolios,riskFreeRate,period);
     }
 
 
