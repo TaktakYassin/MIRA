@@ -87,6 +87,14 @@ public class MainService extends Outils {
         return meanVariations;
     }
 
+    private double calculQuantille(double[] valeurs,double ordre){
+
+        int index=(int) (ordre*valeurs.length);
+        double[] buffer=valeurs.clone();
+        Arrays.sort(buffer);
+        return buffer[index];
+    }
+
     public List<ClientStat> recuperateStat(){
 
         List<ClientStat> stats=new ArrayList<>();
@@ -107,9 +115,9 @@ public class MainService extends Outils {
             std=equarType(buffer,mean,count);
             min=minimum(buffer);
             max=maximum(buffer);
-            twentyFive=(max-min)/4+min;
-            fifty=(max-min)/2+min;
-            seventyFive=(max-min)*3/4+min;
+            twentyFive=calculQuantille(buffer,0.25);
+            fifty=calculQuantille(buffer,0.5);
+            seventyFive=calculQuantille(buffer,0.75);
             stats.add(new ClientStat(clients.get(j),count,mean,std,min,twentyFive,fifty,seventyFive,max));
         }
         return stats;
@@ -141,8 +149,7 @@ public class MainService extends Outils {
         return vectorResult;
     }
 
-    private RandomPortfolioResult randomPortfolios(
-            int numPortfolios,double[] meanReturns, double[][] covMatrix, double riskFreeRate,int periode){
+    private RandomPortfolioResult randomPortfolios(int numPortfolios,double[] meanReturns, double[][] covMatrix, double riskFreeRate,int periode){
         double[][] results = initMatrice(3,numPortfolios);
         double[] weights;
         double[][] weightsRecord=new double[numPortfolios][meanReturns.length];
@@ -213,6 +220,57 @@ public class MainService extends Outils {
         return weights;
 
     }
+
+    private double negSharpeRatio(double[] weights,double[] meanReturns, double[][] covMatrix, double riskFreeRate,int periode){
+        PortfolioResult portfolioResult= portfolioAnnualisedPerformance(weights, meanReturns, covMatrix,periode);
+        return (portfolioResult.getPortfolioReturn() - riskFreeRate) / portfolioResult.getPortfolioStdDev();
+    }
+
+    /*private maxSharpeRatio(double[] meanReturns, double[][] covMatrix, double riskFreeRate){
+       int num_assets=meanReturns.length;
+        args = (meanReturns, covMatrix, riskFreeRate);
+        constraints = ({'type': 'eq', 'fun': lambda x: np.sum(x) - 1})
+        bound = (0.0,1.0)
+        bounds = tuple(bound for asset in range(num_assets))
+        result = sco.minimize(neg_sharpe_ratio, num_assets*[1./num_assets,], args=args, method='SLSQP', bounds=bounds, constraints=constraints)
+        return result
+    }*/
+
+
+    private double portfolioVolatility(double[] weights,double[] meanReturns,double[][] covMatrix,int periode) {
+        return portfolioAnnualisedPerformance(weights, meanReturns, covMatrix,periode).getPortfolioStdDev();
+    }
+
+    /*private double minVariance(double[] meanReturns,double[][] covMatrix){
+
+        int num_assets=meanReturns.length;
+        args = (meanReturns, covMatrix)
+        constraints = ({'type': 'eq', 'fun': lambda x: np.sum(x) - 1})
+        bound = (0.0,1.0)
+        bounds = tuple(bound for asset in range(num_assets))
+        result = sco.minimize(portfolio_volatility, num_assets*[1./num_assets,], args=args, method='SLSQP', bounds=bounds, constraints=constraints)
+        return result
+
+    }
+
+
+    private double efficient_return(double[] meanReturns,double[][] covMatrix,double target){
+        int num_assets=meanReturns.length;
+        args = (mean_returns, cov_matrix)
+        constraints = ({'type': 'eq', 'fun': lambda x:portfolioAnnualisedPerformance(weights,meanReturns,covMatrix).getPortfolioReturn()- target},{'type': 'eq', 'fun': lambda x: np.sum(x) - 1})
+        bounds = tuple((0,1) for asset in range(num_assets))
+        result = sco.minimize(portfolioVolatility(), num_assets*[1./num_assets,], args=args,bounds=bounds,constraints=constraints);
+        return result;
+    }
+
+    private double[] efficient_frontier(double[] meanReturns,double[][] covMatrix, double[] returnsRange){
+        double[] efficients = new double[returnsRange.length];
+            for (int i=0;i<returnsRange.length;i++)
+            efficients[i]=efficient_return(meanReturns,covMatrix,returnsRange[i]);
+        return efficients;
+    }*/
+
+
 
 
 }
